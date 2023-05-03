@@ -4,14 +4,14 @@ let apiRouter = express.Router()
 //Processa corpo em formato JSON
 apiRouter.use (express.json())
 
-const environment = process.env.ENVIRONMENT || 'development'
+const environment = process.env.ENVIRONMENT || 'production'
 const config = require('../../knexfile.js')[environment];
 const knex = require('knex')(config);
 
 const endpoint = '/'
 
 apiRouter.get (endpoint + 'produtos', (req, res) => {
-    knex.select('*').from('produtos')
+    knex.select('*').from('produtos').orderBy('id', 'asc')
         .then(produtos => res.status(200).json ({ data : produtos }))    
         .catch(err => res.status(400).json({ errors : `Erro ao obter produtos. ${err.message}` }))
 })
@@ -31,6 +31,14 @@ apiRouter.get (endpoint + 'produtos/:id', (req, res) => {
 apiRouter.post (endpoint + 'produtos', (req, res) => {
     let produtoRequest = req.body
     
+    knex.select('*').from('produtos').where({ descricao: produtoRequest.descricao })
+        .then(produtos => {
+            let produto = produtos[0]
+            if (produto != null)
+                res.status(400).json({ errors : "Este produto já existe." })
+        })
+        .catch(err => res.status(400).json({ errors : `Erro ao obter o produto. ${err.message}` }))
+
     knex('produtos').insert(produtoRequest, ['id'])
         .then(produtos => {
             produtoRequest.id = produtos[0].id
@@ -51,7 +59,7 @@ apiRouter.put (endpoint + 'produtos/:id', (req, res) => {
             if (produtoSelect == null || produtosSelect.length == 0)
                 res.status(404).json({ data : null })
             
-            knex('produtos').update(produtoRequest)
+            knex('produtos').update(produtoRequest).where({ id: req.params.id })
                 .then(produtosUpdate => {
                     let produtoUpdate = produtosUpdate[0]
                     res.status(200).json({ data : produtoRequest })
